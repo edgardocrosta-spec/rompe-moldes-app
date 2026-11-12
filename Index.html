@@ -7290,12 +7290,15 @@
       let lastReconstructionPlan = null;
 
       function computeCardReconstructionPlan() {
-        const cardTotals = new Map(); // cardId -> { cardObj, amount, sources: [] }
+        const cardTotals = new Map(); // cardId -> { cardObj, amount, count, items: [] }
         (state.userCards || []).forEach(c => {
-          cardTotals.set(c.id, { cardObj: c, amount: 0, count: 0 });
+          cardTotals.set(c.id, { cardObj: c, amount: 0, count: 0, items: [] });
         });
 
-        // 1. Escanear compromisos automáticos en presupuestos (💳 Resumen [Nombre] y 💳 Cuota [...] ([Nombre]))
+        const unmatchedCommitments = [];
+        const matchedCommitmentKeys = new Set();
+
+        // 1. Escanear TODOS los compromisos automáticos en presupuestos (isAutoCardCommitment)
         Object.entries(state.budgetsByMonth || {}).forEach(([mKey, b]) => {
           const fijaItems = (b.containers && b.containers.fija && b.containers.fija.items) || [];
           fijaItems.forEach(it => {
@@ -7303,28 +7306,47 @@
             const amt = Number(it.budget || 0);
             if (amt <= 0) return;
             const nm = (it.name || '').toLowerCase();
+            let matched = false;
             for (const c of (state.userCards || [])) {
               const cName = (c.name || '').toLowerCase().trim();
               if (cName && nm.includes(cName)) {
                 const entry = cardTotals.get(c.id);
                 entry.amount += amt;
                 entry.count += 1;
+                entry.items.push({ month: mKey, name: it.name, amount: amt });
+                matchedCommitmentKeys.add(`${mKey}|${it.name}`);
+                matched = true;
                 break;
               }
+            }
+            if (!matched) {
+              unmatchedCommitments.push({ month: mKey, name: it.name, amount: amt });
             }
           });
         });
 
-        // 2. Sumar también movimientos que ya tengan cardId explícito y no hayan sido contabilizados arriba
+        // 2. Escanear movimientos (state.expenses) que puedan explicar parte de la diferencia
+        // (ej. movimientos con cardId sin compromiso, o movimientos recientes sin cardId que no son efectivo/débito)
+        const untaggedExpenses = [];
+        let untaggedExpensesSum = 0;
         (state.expenses || []).forEach(exp => {
-          if (exp.type === 'expense' && exp.cardId && (exp.paymentMethod === 'card_single' || exp.paymentMethod === 'card_installments')) {
+          if (exp.type !== 'expense') return;
+          const amt = Number(exp.amount || 0);
+          if (amt <= 0) return;
+          if (exp.cardId && (exp.paymentMethod === 'card_single' || exp.paymentMethod === 'card_installments')) {
             if (cardTotals.has(exp.cardId) && !exp.isAutoDebit) {
-              // Solo si no hay un compromiso previo con mismo monto ya contado, o si es nuevo
               const entry = cardTotals.get(exp.cardId);
               if (entry.count === 0) {
-                entry.amount += Number(exp.amount || 0);
+                entry.amount += amt;
                 entry.count += 1;
+                entry.items.push({ month: (exp.date || '').slice(0, 7), name: `${exp.categoryName || 'Gasto'} (${exp.note || 'sin nota'})`, amount: amt });
               }
+            }
+          } else if (!exp.paymentMethod || exp.paymentMethod === 'card_single' || exp.paymentMethod === 'card_installments') {
+            // Movimientos cargados antes de guardar paymentMethod/cardId
+            if (!exp.isAutoDebit && exp.paymentMethod !== 'cash' && exp.paymentMethod !== 'bank') {
+              untaggedExpenses.push(exp);
+              untaggedExpensesSum += amt;
             }
           }
         });
@@ -7339,6 +7361,9 @@
 
         return {
           cardTotals,
+          unmatchedCommitments,
+          untaggedExpenses: untaggedExpenses.sort((a, b) => (b.date || '').localeCompare(a.date || '')),
+          untaggedExpensesSum,
           legacyItem,
           legacyAmount,
           reconstructedSum,
@@ -7353,18 +7378,64 @@
 
         const rows = [];
         lastReconstructionPlan.cardTotals.forEach(v => {
+          const detailHtml = v.items.length > 0
+            ? `<div class="mt-1.5 pt-1.5 border-t border-zinc-800/80 space-y-0.5 text-[10px] text-zinc-400">${v.items.map(i => `<div class="flex justify-between"><span>${i.month} · ${i.name}</span><span>${formatCurrency(i.amount)}</span></div>`).join('')}</div>`
+            : '';
           rows.push(`
-            <div class="flex items-center justify-between p-2 rounded-xl bg-zinc-900/90 border border-zinc-800">
-              <div>
-                <div class="font-bold text-zinc-100">💳 ${v.cardObj.name}</div>
-                <div class="text-[10px] text-zinc-500">${v.count} registro(s) detectado(s)</div>
+            <div class="p-2.5 rounded-xl bg-zinc-900/90 border border-zinc-800">
+              <div class="flex items-center justify-between">
+                <div>
+                  <div class="font-bold text-zinc-100">💳 ${v.cardObj.name}</div>
+                  <div class="text-[10px] text-zinc-500">${v.count} registro(s) detectado(s)</div>
+                </div>
+                <span class="font-extrabold text-gold">${formatCurrency(v.amount)}</span>
               </div>
-              <span class="font-extrabold text-gold">${formatCurrency(v.amount)}</span>
+              ${detailHtml}
             </div>
           `);
         });
 
         const diff = lastReconstructionPlan.unmatchedDiff;
+
+        let unmatchedHtml = '';
+        if (lastReconstructionPlan.unmatchedCommitments.length > 0) {
+          unmatchedHtml += `
+            <div class="p-2.5 rounded-xl bg-amber-950/30 border border-amber-500/30 space-y-1">
+              <div class="text-[10px] font-bold text-amber-300 uppercase">Compromisos en Presupuesto sin coincidencia exacta:</div>
+              ${lastReconstructionPlan.unmatchedCommitments.map(u => `<div class="flex justify-between text-[10px] text-zinc-300"><span>${u.month} · ${u.name}</span><strong>${formatCurrency(u.amount)}</strong></div>`).join('')}
+            </div>
+          `;
+        }
+
+        if (lastReconstructionPlan.untaggedExpenses.length > 0) {
+          const expRows = lastReconstructionPlan.untaggedExpenses.map(e => `
+            <div class="flex justify-between text-[10px] text-zinc-300 py-0.5 border-b border-zinc-800/60 last:border-0">
+              <span class="truncate pr-2">${e.date || ''} · ${e.categoryName || 'Gasto'}${e.note ? ' (' + e.note + ')' : ''}</span>
+              <strong class="shrink-0 text-zinc-100">${formatCurrency(e.amount)}</strong>
+            </div>
+          `).join('');
+          unmatchedHtml += `
+            <div class="p-2.5 rounded-xl bg-zinc-900 border border-zinc-800 space-y-1.5">
+              <div class="flex justify-between items-center">
+                <span class="text-[10px] font-bold text-zinc-400 uppercase">Gastos históricos sin etiqueta de medio (${lastReconstructionPlan.untaggedExpenses.length}):</span>
+                <span class="text-[10px] font-bold text-amber-300">${formatCurrency(lastReconstructionPlan.untaggedExpensesSum)}</span>
+              </div>
+              <div class="max-h-36 overflow-y-auto space-y-0.5 pr-1">${expRows}</div>
+              <p class="text-[9px] text-zinc-500 leading-tight">Nota: si cargaste efectivo/débito antes de que existiera el selector de medio, también aparecen aquí. Lo que no esté en esta lista corresponde al saldo inicial que ya tenía tu renglón de tarjeta.</p>
+            </div>
+          `;
+        }
+
+        const assignSelectHtml = diff > 0 ? `
+          <div class="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 space-y-1.5">
+            <label class="block text-[10px] font-bold text-amber-300 uppercase">¿A qué tarjeta querés asignar la diferencia de ${formatCurrency(diff)}?</label>
+            <select id="select-assign-diff-card" class="w-full px-2.5 py-2 rounded-lg bg-zinc-900 border border-zinc-700 text-zinc-100 text-xs outline-none">
+              <option value="__keep_separate__">Dejar aparte como "Saldo Tarjetas (Sin desglosar)"</option>
+              ${(state.userCards || []).map(c => `<option value="${c.id}">Sumar a 💳 ${c.name}</option>`).join('')}
+            </select>
+          </div>
+        ` : '';
+
         body.innerHTML = `
           <div class="p-2.5 rounded-xl bg-zinc-900 border border-zinc-800 space-y-1 text-[11px]">
             <div class="flex justify-between"><span>Saldo actual en renglón único:</span><strong class="text-red-400">${formatCurrency(lastReconstructionPlan.legacyAmount)}</strong></div>
@@ -7372,10 +7443,11 @@
             ${diff !== 0 ? `<div class="flex justify-between border-t border-zinc-800 pt-1 mt-1"><span>Diferencia sin etiqueta de tarjeta:</span><strong class="text-amber-300">${formatCurrency(diff)}</strong></div>` : ''}
           </div>
           <div class="space-y-1.5">
-            <div class="text-[10px] uppercase tracking-wider text-zinc-400 font-bold">Nuevos Pasivos Nominales a Crear:</div>
+            <div class="text-[10px] uppercase tracking-wider text-zinc-400 font-bold">Desglose Detectado por Tarjeta:</div>
             ${rows.join('')}
           </div>
-          ${diff > 0 ? `<p class="text-[10px] text-amber-200/90 leading-snug">💡 La diferencia de <strong>${formatCurrency(diff)}</strong> quedará como "Saldo Inicial Tarjetas / Sin Desglosar" para que no se pierda ni un peso y puedas asignarlo o editarlo luego.</p>` : ''}
+          ${unmatchedHtml}
+          ${assignSelectHtml}
         `;
 
         document.getElementById('modal-temp-reconstruct')?.classList.remove('hidden');
@@ -7391,6 +7463,7 @@
       document.getElementById('btn-apply-temp-reconstruct')?.addEventListener('click', () => {
         if (!lastReconstructionPlan) return;
         const cleanBudgets = document.getElementById('chk-clean-old-card-commitments')?.checked;
+        const assignTarget = document.getElementById('select-assign-diff-card')?.value || '__keep_separate__';
 
         let cortoGrp = (state.patrimonio.pasivosGroups || []).find(g => g.id === 'cortoPlazo');
         if (!cortoGrp) {
@@ -7408,9 +7481,20 @@
           }
         });
 
-        // Ajustar o remover el renglón legado anterior
-        if (lastReconstructionPlan.legacyItem) {
-          const rem = Math.max(0, lastReconstructionPlan.unmatchedDiff);
+        // Manejar la diferencia sin etiqueta según elección del usuario
+        const rem = Math.max(0, lastReconstructionPlan.unmatchedDiff);
+        if (rem > 0 && assignTarget !== '__keep_separate__') {
+          const targetCard = (state.userCards || []).find(c => c.id === assignTarget);
+          if (targetCard) {
+            const item = findCardLiabilityItem(targetCard, state.patrimonio, true);
+            if (item) {
+              item.amount = Number(item.amount || 0) + rem;
+            }
+          }
+          if (lastReconstructionPlan.legacyItem) {
+            cortoGrp.items = cortoGrp.items.filter(it => it.id !== lastReconstructionPlan.legacyItem.id);
+          }
+        } else if (lastReconstructionPlan.legacyItem) {
           if (rem > 0) {
             lastReconstructionPlan.legacyItem.name = '💳 Saldo Tarjetas (Sin desglosar)';
             lastReconstructionPlan.legacyItem.amount = rem;
