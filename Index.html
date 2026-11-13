@@ -874,13 +874,6 @@
             </div>
           </div>
           <div id="dynamic-liabilities-container" class="space-y-3"></div>
-          <!-- BOTÓN TEMPORAL DE MIGRACIÓN ÚNICA (Se elimina una vez ejecutado) -->
-          <div id="temp-reconstruct-wrapper" class="pt-2">
-            <button id="btn-temp-reconstruct-cards" type="button" class="w-full py-2 px-3 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/40 text-[11px] font-bold flex items-center justify-center space-x-1.5 transition cursor-pointer">
-              <span>🔍</span>
-              <span>Asistente Temporal: Desglosar Mis Pasivos por Tarjeta</span>
-            </button>
-          </div>
         </div>
       </div>
 
@@ -1119,38 +1112,6 @@
   </nav>
 
   <!-- ============================================== -->
-  <!-- MODAL TEMPORAL: RECONSTRUIR PASIVOS POR TARJETA -->
-  <!-- ============================================== -->
-  <div id="modal-temp-reconstruct" class="fixed inset-0 z-[100028] bg-black/88 backdrop-blur-md flex items-center justify-center p-4 hidden">
-    <div class="glass-card w-full max-w-md rounded-3xl p-5 space-y-4 max-h-[90vh] overflow-y-auto no-scrollbar shadow-2xl border border-amber-500/50">
-      <div class="flex items-center justify-between border-b border-zinc-800 pb-3">
-        <div class="flex items-center space-x-2">
-          <span class="text-xl">🔍</span>
-          <div>
-            <h3 class="font-bold text-white text-sm">Reconstrucción de Pasivos por Tarjeta</h3>
-            <p class="text-[10px] text-amber-300">Asistente temporal de migración única</p>
-          </div>
-        </div>
-        <button id="btn-close-temp-reconstruct" type="button" class="text-zinc-400 hover:text-white p-1 text-sm cursor-pointer">✕</button>
-      </div>
-
-      <div id="temp-reconstruct-body" class="space-y-3 text-xs text-zinc-300">
-        <!-- Populated dynamically -->
-      </div>
-
-      <label class="flex items-start space-x-2 p-2.5 rounded-xl bg-zinc-900 border border-zinc-800 cursor-pointer text-[11px] text-zinc-300">
-        <input type="checkbox" id="chk-clean-old-card-commitments" checked class="mt-0.5 accent-amber-400">
-        <span>Limpiar también los renglones viejos <strong class="text-gold">💳 Resumen / Cuota</strong> de Estructura Fija en presupuestos para no duplicar gastos.</span>
-      </label>
-
-      <div class="flex space-x-2 pt-1">
-        <button id="btn-cancel-temp-reconstruct" type="button" class="flex-1 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-semibold rounded-xl text-xs cursor-pointer">Cancelar</button>
-        <button id="btn-apply-temp-reconstruct" type="button" class="flex-1 py-2.5 bg-gradient-to-r from-amber-500 to-gold text-zinc-950 font-extrabold rounded-xl text-xs shadow-md hover:brightness-105 cursor-pointer">✅ Aplicar Desglose</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- ============================================== -->
   <!-- MODAL: HISTORIAL COMPLETO DE MOVIMIENTOS       -->
   <!-- ============================================== -->
   <div id="modal-all-movements" class="fixed inset-0 z-[100000] bg-black/85 backdrop-blur-md flex items-center justify-center p-4 hidden">
@@ -1281,8 +1242,23 @@
         </button>
       </div>
 
-      <!-- PANEL 1: FORMULARIO DE ALTA DE PRÉSTAMO -->
+      <!-- PANEL 1: FORMULARIO DE ALTA DE PRÉSTAMO / PLAN DE PAGOS -->
       <div id="panel-loan-new" class="space-y-3.5 text-xs">
+        <div class="grid grid-cols-2 gap-1.5 p-1 rounded-xl bg-zinc-900 border border-zinc-800">
+          <button type="button" id="btn-mode-loan-cash" class="py-1.5 px-2 rounded-lg font-bold bg-amber-500 text-zinc-950 text-[11px] transition cursor-pointer">
+            🏦 Préstamo Recibido
+          </button>
+          <button type="button" id="btn-mode-loan-plan" class="py-1.5 px-2 rounded-lg font-semibold text-zinc-400 hover:text-zinc-200 text-[11px] transition cursor-pointer">
+            🧾 Plan de Pagos (ARCA/ABL)
+          </button>
+        </div>
+
+        <div id="loan-replace-existing-wrap" class="hidden p-2.5 rounded-xl bg-zinc-900/90 border border-amber-500/30 space-y-1.5">
+          <label class="text-[10px] font-bold text-amber-300 uppercase">¿Regulariza una deuda ya cargada en Patrimonio?</label>
+          <select id="loan-replace-existing-select" class="w-full bg-zinc-800 border border-zinc-700 rounded-xl p-2 text-zinc-100 text-xs focus:outline-none">
+            <option value="">— No, crear deuda nueva en Impuestos/Otros —</option>
+          </select>
+        </div>
         
         <!-- Paso 1: Selector de las 4 Modalidades -->
         <div class="space-y-1.5">
@@ -1316,10 +1292,10 @@
 
           <div class="grid grid-cols-2 gap-2">
             <div class="space-y-1">
-              <label class="text-zinc-300 font-medium">Capital Recibido Hoy ($):</label>
+              <label id="label-loan-capital" class="text-zinc-300 font-medium">Capital Recibido Hoy ($):</label>
               <input type="number" step="any" inputmode="decimal" id="loan-input-capital" placeholder="0" class="w-full bg-zinc-800 border border-amber-500/40 rounded-xl p-2 text-amber-300 font-bold text-sm focus:outline-none">
             </div>
-            <div class="space-y-1">
+            <div id="loan-dest-col-wrap" class="space-y-1">
               <label class="text-zinc-300 font-medium">¿Dónde entró hoy?:</label>
               <div class="grid grid-cols-2 gap-1 bg-zinc-800 p-1 rounded-xl border border-zinc-700">
                 <button type="button" id="btn-loan-dest-bank" class="py-1.5 px-1.5 rounded-lg font-bold bg-emerald-500 text-zinc-950 text-[10px] transition cursor-pointer">
@@ -2320,21 +2296,27 @@
         ],
         pasivosGroups: [
           {
-            id: 'cortoPlazo',
-            name: 'Corto Plazo (Tarjetas / Deuda cara)',
+            id: 'tarjetas',
+            name: 'Tarjetas de Crédito',
             icon: '💳',
             items: [
-              { id: 'pc_1', name: 'Resumen a vencer Tarjeta de Crédito', amount: 290000 },
-              { id: 'pc_2', name: 'Préstamo personal / Adelanto', amount: 90000 }
+              { id: 'pc_1', name: 'Resumen a vencer Tarjeta de Crédito', amount: 290000 }
             ]
           },
           {
-            id: 'largoPlazo',
-            name: 'Largo Plazo (Prendario / Hipoteca)',
-            icon: '🏠',
+            id: 'prestamos',
+            name: 'Préstamos y Financiaciones',
+            icon: '🏦',
             items: [
-              { id: 'pl_1', name: 'Crédito Prendario / Hipotecario', amount: 3800000 }
+              { id: 'pc_2', name: 'Préstamo personal / Adelanto', amount: 90000, isExigible: false },
+              { id: 'pl_1', name: 'Crédito Prendario / Hipotecario', amount: 3800000, isExigible: false }
             ]
+          },
+          {
+            id: 'impuestos',
+            name: 'Impuestos, Organismos y Otros',
+            icon: '🧾',
+            items: []
           }
         ]
       }
@@ -2359,6 +2341,7 @@
             }
             if (!data.cardCommitments) data.cardCommitments = [];
             if (!data.activeLoans) data.activeLoans = [];
+            if (data.patrimonio) migratePasivosToThreeCategories(data.patrimonio);
             if (!data.appliedMovementIds) {
               data.appliedMovementIds = (data.expenses || []).map(e => e.id);
             }
@@ -2396,11 +2379,45 @@
     // ==============================================
     // MOTOR DE PASIVOS POR TARJETA Y DÉBITOS AUTOMÁTICOS
     // ==============================================
+    function migratePasivosToThreeCategories(targetPatrimonio) {
+      if (!targetPatrimonio || !Array.isArray(targetPatrimonio.pasivosGroups)) return false;
+      const hasLegacy = targetPatrimonio.pasivosGroups.some(g => g.id === 'cortoPlazo' || g.id === 'largoPlazo');
+      const hasAllThree = ['tarjetas', 'prestamos', 'impuestos'].every(id => targetPatrimonio.pasivosGroups.some(g => g.id === id));
+      if (!hasLegacy && hasAllThree) return false;
+
+      const grpTarjetas = { id: 'tarjetas', name: 'Tarjetas de Crédito', icon: '💳', items: [] };
+      const grpPrestamos = { id: 'prestamos', name: 'Préstamos y Financiaciones', icon: '🏦', items: [] };
+      const grpImpuestos = { id: 'impuestos', name: 'Impuestos, Organismos y Otros', icon: '🧾', items: [] };
+
+      targetPatrimonio.pasivosGroups.forEach(g => {
+        if (g.id === 'tarjetas') { grpTarjetas.items.push(...(g.items || [])); return; }
+        if (g.id === 'prestamos') { grpPrestamos.items.push(...(g.items || [])); return; }
+        if (g.id === 'impuestos') { grpImpuestos.items.push(...(g.items || [])); return; }
+
+        (g.items || []).forEach(it => {
+          const nm = (it.name || '').toLowerCase();
+          if (it.cardId || it.isCardLiability || nm.includes('💳') || nm.includes('tarjeta') || nm.includes('visa') || nm.includes('mastercard') || nm.includes('amex') || nm.includes('cabal') || nm.includes('naranja')) {
+            grpTarjetas.items.push(it);
+          } else if (it.loanId || nm.includes('préstamo') || nm.includes('prestamo') || nm.includes('adelanto') || nm.includes('prendario') || nm.includes('hipotecario') || nm.includes('p2p') || nm.includes('crédito') || nm.includes('credito')) {
+            if (typeof it.isExigible === 'undefined') it.isExigible = false;
+            grpPrestamos.items.push(it);
+          } else {
+            if (typeof it.isExigible === 'undefined') it.isExigible = false;
+            grpImpuestos.items.push(it);
+          }
+        });
+      });
+
+      targetPatrimonio.pasivosGroups = [grpTarjetas, grpPrestamos, grpImpuestos];
+      return true;
+    }
+
     function findCardLiabilityItem(cardObj, targetPatrimonio = state.patrimonio, createIfMissing = false) {
-      if (!targetPatrimonio || !targetPatrimonio.pasivosGroups) return null;
-      let cortoGrp = targetPatrimonio.pasivosGroups.find(g => g.id === 'cortoPlazo');
+      if (!targetPatrimonio || !Array.isArray(targetPatrimonio.pasivosGroups)) return null;
+      migratePasivosToThreeCategories(targetPatrimonio);
+      let cortoGrp = targetPatrimonio.pasivosGroups.find(g => g.id === 'tarjetas');
       if (!cortoGrp) {
-        cortoGrp = { id: 'cortoPlazo', name: 'Corto Plazo (Tarjetas / Deuda cara)', icon: '💳', items: [] };
+        cortoGrp = { id: 'tarjetas', name: 'Tarjetas de Crédito', icon: '💳', items: [] };
         targetPatrimonio.pasivosGroups.unshift(cortoGrp);
       }
       if (!cortoGrp.items) cortoGrp.items = [];
@@ -2833,7 +2850,7 @@
               ef.amount = Number(ef.amount || 0) + amount;
             }
           } else if (incDest === 'card') {
-            const cortoGrp = targetState.patrimonio?.pasivosGroups?.find(g => g.id === 'cortoPlazo');
+            const cortoGrp = targetState.patrimonio?.pasivosGroups?.find(g => g.id === 'tarjetas');
             if (cortoGrp && cortoGrp.items.length > 0) {
               cortoGrp.items[0].amount = Math.max(0, Number(cortoGrp.items[0].amount || 0) - amount);
             }
@@ -4774,7 +4791,7 @@
             ef.amount = Math.max(0, Number(ef.amount || 0) - amount);
           }
         } else if (incDest === 'card') {
-          const cortoGrp = state.patrimonio.pasivosGroups.find(g => g.id === 'cortoPlazo');
+          const cortoGrp = state.patrimonio.pasivosGroups.find(g => g.id === 'tarjetas');
           if (cortoGrp && cortoGrp.items.length > 0) {
             cortoGrp.items[0].amount = Number(cortoGrp.items[0].amount || 0) + amount;
           }
@@ -4892,7 +4909,7 @@
               ef.amount = Math.max(0, Number(ef.amount || 0) + diffAmount);
             }
           } else if (incDest === 'card') {
-            const cortoGrp = state.patrimonio.pasivosGroups.find(g => g.id === 'cortoPlazo');
+            const cortoGrp = state.patrimonio.pasivosGroups.find(g => g.id === 'tarjetas');
             if (cortoGrp && cortoGrp.items.length > 0) {
               cortoGrp.items[0].amount = Math.max(0, Number(cortoGrp.items[0].amount || 0) - diffAmount);
             }
@@ -5308,6 +5325,7 @@
     }
 
     function calculateDynamicRunway() {
+      if (state.patrimonio) migratePasivosToThreeCategories(state.patrimonio);
       let totalLiquidos = 0;
       state.patrimonio.activosGroups.forEach(g => {
         if (g.isLiquid || g.id === 'liquidos') {
@@ -5315,22 +5333,79 @@
         }
       });
 
-      const cortoGrp = state.patrimonio.pasivosGroups.find(g => g.id === 'cortoPlazo');
-      const tarjetasInmediatas = cortoGrp ? cortoGrp.items.reduce((s, i) => s + Number(i.amount || 0), 0) : 0;
-      const oxigenoNeto = Math.max(0, totalLiquidos - tarjetasInmediatas);
+      // 1. Tarjetas de Crédito (100% exigible en Inicio -> Tarjetas y Paz Mental)
+      const tarjetasGrp = state.patrimonio.pasivosGroups.find(g => g.id === 'tarjetas');
+      const tarjetasInmediatas = tarjetasGrp ? tarjetasGrp.items.reduce((s, i) => s + Number(i.amount || 0), 0) : 0;
 
-      const activeMonthKey = new Date().toISOString().slice(0, 7);
-      const totals = calculateContainerTotals(activeMonthKey);
-      let burnRate = totals.burnRateInnegociable;
-      if (burnRate <= 0) burnRate = 600000;
+      // 2. Deudas manuales marcadas como "Exigible este mes" en Préstamos o Impuestos (sin cronograma)
+      let immediateManualDebts = 0;
+      state.patrimonio.pasivosGroups.forEach(g => {
+        if (g.id === 'prestamos' || g.id === 'impuestos') {
+          (g.items || []).forEach(it => {
+            if (it.isExigible && !it.loanId) {
+              immediateManualDebts += Number(it.amount || 0);
+            }
+          });
+        }
+      });
 
-      const runwayMonths = (oxigenoNeto / burnRate).toFixed(1);
+      const oxigenoNeto = Math.max(0, totalLiquidos - tarjetasInmediatas - immediateManualDebts);
+
+      // 3. Gasto básico mensual innegociable SIN cuotas de préstamos/planes (para evitar doble conteo)
+      const now = new Date();
+      const activeMonthKey = now.toISOString().slice(0, 7);
+      const activeBudget = getBudgetForMonth(activeMonthKey);
+      let baseLivingBurn = 0;
+      const fijaItems = (activeBudget.containers && activeBudget.containers.fija && activeBudget.containers.fija.items) || [];
+      fijaItems.forEach(it => {
+        if (!it.loanId) baseLivingBurn += Number(it.budget || 0);
+      });
+      const varItems = (activeBudget.containers && activeBudget.containers.variables && activeBudget.containers.variables.items) || [];
+      varItems.forEach(it => {
+        baseLivingBurn += Number(it.budget || 0);
+      });
+      if (baseLivingBurn <= 0) baseLivingBurn = 600000;
+
+      // 4. Simulación honesta mes a mes: vida básica + cuotas reales de préstamos/planes vigentes
+      let remainingCash = oxigenoNeto;
+      let simulatedMonths = 0;
+      if (remainingCash > 0) {
+        for (let m = 0; m < 120; m++) {
+          const d = new Date(now.getFullYear(), now.getMonth() + m, 1);
+          const mKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+          const mBudget = (state.budgetsByMonth && state.budgetsByMonth[mKey]) || null;
+          let monthLoanQuotas = 0;
+          if (mBudget && mBudget.containers && mBudget.containers.fija && Array.isArray(mBudget.containers.fija.items)) {
+            mBudget.containers.fija.items.forEach(it => {
+              if (it.loanId) {
+                const quotaAmt = Number(it.budget || 0);
+                if (m === 0) {
+                  monthLoanQuotas += Math.max(0, quotaAmt - Number(it.spent || 0));
+                } else {
+                  monthLoanQuotas += quotaAmt;
+                }
+              }
+            });
+          }
+          const monthNeed = baseLivingBurn + monthLoanQuotas;
+          if (monthNeed <= 0) break;
+          if (remainingCash >= monthNeed) {
+            remainingCash -= monthNeed;
+            simulatedMonths += 1;
+          } else {
+            simulatedMonths += (remainingCash / monthNeed);
+            remainingCash = 0;
+            break;
+          }
+        }
+      }
+
       return {
-        runwayMonths: parseFloat(runwayMonths),
+        runwayMonths: parseFloat(simulatedMonths.toFixed(1)),
         oxigenoNeto,
         totalLiquidos,
         tarjetasInmediatas,
-        burnRate
+        burnRate: baseLivingBurn
       };
     }
 
@@ -5453,7 +5528,7 @@
             efectivoItem.amount += amount;
           }
         } else if (currentIncomeDestination === 'card') {
-          const cortoGrp = state.patrimonio.pasivosGroups.find(g => g.id === 'cortoPlazo');
+          const cortoGrp = state.patrimonio.pasivosGroups.find(g => g.id === 'tarjetas');
           if (cortoGrp && cortoGrp.items.length > 0) {
             cortoGrp.items[0].amount = Math.max(0, cortoGrp.items[0].amount - amount);
           }
@@ -6310,6 +6385,7 @@
     // MÓDULO F: LÓGICA DE FINANCIAMIENTO Y PRÉSTAMOS
     // ==============================================
     let currentLoanModality = 'rapido';
+    let isPaymentPlanMode = false;
     let currentLoanDestination = 'bank';
     let currentRapidoSubmode = '1pago';
     let currentPersonasSubmode = 'flexible';
@@ -6626,6 +6702,7 @@
       const loanId = 'loan_' + Date.now();
       const liabilityItemId = 'liab_' + loanId;
 
+      if (!isPaymentPlanMode) {
       // 1. En Caja/Bancos (Activos Líquidos): Sumar Capital Recibido Hoy
       const liquidGrp = state.patrimonio.activosGroups.find(g => g.isLiquid || g.id === 'liquidos');
       if (liquidGrp && liquidGrp.items.length > 0) {
@@ -6674,15 +6751,28 @@
       if (!state.eventualIncomes) state.eventualIncomes = [];
       state.eventualIncomes.push(eventualLoanIncome);
 
-      // 4. En Patrimonio (Pasivos): Crear deuda exigible por el Total a Devolver
-      const targetPasivoGroupId = data.isLongTerm ? 'largoPlazo' : 'cortoPlazo';
-      let pasivoGrp = state.patrimonio.pasivosGroups.find(g => g.id === targetPasivoGroupId) || state.patrimonio.pasivosGroups[0];
+      }
+
+      // 4. En Patrimonio (Pasivos): Crear o reemplazar deuda en Préstamos o Impuestos
+      migratePasivosToThreeCategories(state.patrimonio);
+      const replaceExistingVal = isPaymentPlanMode ? (document.getElementById('loan-replace-existing-select')?.value || '') : '';
+      if (replaceExistingVal) {
+        const [repGrpId, repItemId] = replaceExistingVal.split('|');
+        const repGrp = state.patrimonio.pasivosGroups.find(g => g.id === repGrpId);
+        if (repGrp) {
+          repGrp.items = repGrp.items.filter(it => it.id !== repItemId);
+        }
+      }
+
+      const targetPasivoGroupId = isPaymentPlanMode ? 'impuestos' : 'prestamos';
+      let pasivoGrp = state.patrimonio.pasivosGroups.find(g => g.id === targetPasivoGroupId) || state.patrimonio.pasivosGroups[1] || state.patrimonio.pasivosGroups[0];
       if (pasivoGrp) {
         pasivoGrp.items.push({
           id: liabilityItemId,
           loanId: loanId,
-          name: `⚡ Préstamo ${data.entity} (${data.modalityLabel})`,
-          amount: data.totalDebt
+          name: isPaymentPlanMode ? `🧾 Plan ${data.entity} (${data.modalityLabel})` : `🏦 Préstamo ${data.entity} (${data.modalityLabel})`,
+          amount: data.totalDebt,
+          isPaymentPlan: isPaymentPlanMode
         });
       }
 
@@ -6823,7 +6913,7 @@
 
       const liquidGrp = state.patrimonio.activosGroups.find(g => g.isLiquid);
       const liquidTeorico = liquidGrp ? liquidGrp.items.reduce((s, i) => s + Number(i.amount || 0), 0) : 0;
-      const cortoGrp = state.patrimonio.pasivosGroups.find(g => g.id === 'cortoPlazo');
+      const cortoGrp = state.patrimonio.pasivosGroups.find(g => g.id === 'tarjetas');
       const tarjetaTeorico = cortoGrp ? cortoGrp.items.reduce((s, i) => s + Number(i.amount || 0), 0) : 0;
 
       const elLiq = document.getElementById('arqueo-teorico-liquido');
@@ -6904,7 +6994,14 @@
                 <div class="flex items-center justify-between py-1 text-xs border-b border-zinc-800/40 last:border-0">
                   <div class="truncate pr-2">
                     <span class="text-zinc-300 font-medium truncate block">${it.name}</span>
-                    <span class="text-[10px] text-red-400 font-bold">${formatCurrency(it.amount)}</span>
+                    <div class="flex items-center space-x-1.5 mt-0.5">
+                      <span class="text-[10px] text-red-400 font-bold">${formatCurrency(it.amount)}</span>
+                      ${(g.id === 'prestamos' || g.id === 'impuestos') && !it.loanId ? `
+                        <button type="button" class="btn-toggle-exigible px-1.5 py-0.5 rounded-md text-[9px] font-semibold transition cursor-pointer ${it.isExigible ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40' : 'bg-zinc-800 text-zinc-400 border border-zinc-700 hover:text-zinc-200'}" data-group-index="${grpIdx}" data-item-index="${itIdx}" title="Tocar para alternar si vence este mes y afecta Paz Mental">
+                          ${it.isExigible ? '⚡ Exigible este mes' : '⏳ Sin vencimiento'}
+                        </button>
+                      ` : (it.loanId ? `<span class="px-1.5 py-0.5 rounded-md bg-emerald-500/15 text-emerald-400 text-[9px] font-semibold">📅 En cuotas</span>` : '')}
+                    </div>
                   </div>
                   <div class="flex items-center space-x-1.5 flex-shrink-0">
                     ${Number(it.amount || 0) > 0 ? `
@@ -6924,6 +7021,21 @@
           `;
           liabContainer.appendChild(grpCard);
         });
+        liabContainer.querySelectorAll('.btn-toggle-exigible').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const gIdx = parseInt(btn.getAttribute('data-group-index'), 10);
+            const iIdx = parseInt(btn.getAttribute('data-item-index'), 10);
+            const targetItem = state.patrimonio.pasivosGroups[gIdx]?.items[iIdx];
+            if (!targetItem) return;
+            targetItem.isExigible = !targetItem.isExigible;
+            state.lastModified = Date.now();
+            StorageService.save(state);
+            renderPatrimonio();
+            renderDashboard();
+            showToast(targetItem.isExigible ? 'Marcado como exigible este mes' : 'Marcado como sin vencimiento inmediato', '✅');
+          });
+        });
+        
       }
 
       document.querySelectorAll('.btn-edit-patrimonio-row').forEach(btn => {
@@ -7288,321 +7400,6 @@
 
       // Lógica Temporal de Reconstrucción de Pasivos por Tarjeta
       let lastReconstructionPlan = null;
-
-      function computeCardReconstructionPlan() {
-        const cardTotals = new Map(); // cardId -> { cardObj, baseAmount, count, items: [] }
-        (state.userCards || []).forEach(c => {
-          cardTotals.set(c.id, { cardObj: c, baseAmount: 0, count: 0, items: [] });
-        });
-
-        const unmatchedCommitments = [];
-
-        // 1. Escanear compromisos automáticos en presupuestos (isAutoCardCommitment)
-        Object.entries(state.budgetsByMonth || {}).forEach(([mKey, b]) => {
-          const fijaItems = (b.containers && b.containers.fija && b.containers.fija.items) || [];
-          fijaItems.forEach(it => {
-            if (!it.isAutoCardCommitment) return;
-            const amt = Number(it.budget || 0);
-            if (amt <= 0) return;
-            const nm = (it.name || '').toLowerCase();
-            let matched = false;
-            for (const c of (state.userCards || [])) {
-              const cName = (c.name || '').toLowerCase().trim();
-              if (cName && nm.includes(cName)) {
-                const entry = cardTotals.get(c.id);
-                entry.baseAmount += amt;
-                entry.count += 1;
-                entry.items.push({ month: mKey, name: it.name, amount: amt });
-                matched = true;
-                break;
-              }
-            }
-            if (!matched) {
-              unmatchedCommitments.push({ month: mKey, name: it.name, amount: amt });
-            }
-          });
-        });
-
-        // 2. Escanear movimientos (state.expenses)
-        const untaggedExpenses = [];
-        let untaggedExpensesSum = 0;
-        (state.expenses || []).forEach(exp => {
-          if (exp.type !== 'expense') return;
-          const amt = Number(exp.amount || 0);
-          if (amt <= 0) return;
-          if (exp.cardId && (exp.paymentMethod === 'card_single' || exp.paymentMethod === 'card_installments')) {
-            if (cardTotals.has(exp.cardId) && !exp.isAutoDebit) {
-              const entry = cardTotals.get(exp.cardId);
-              if (entry.count === 0) {
-                entry.baseAmount += amt;
-                entry.count += 1;
-                entry.items.push({ month: (exp.date || '').slice(0, 7), name: `${exp.categoryName || 'Gasto'} (${exp.note || 'sin nota'})`, amount: amt });
-              }
-            }
-          } else if (!exp.paymentMethod || exp.paymentMethod === 'card_single' || exp.paymentMethod === 'card_installments') {
-            if (!exp.isAutoDebit && exp.paymentMethod !== 'cash' && exp.paymentMethod !== 'bank') {
-              untaggedExpenses.push(exp);
-              untaggedExpensesSum += amt;
-            }
-          }
-        });
-
-        // 3. Comparar contra el renglón legado actual en Corto Plazo
-        const cortoGrp = (state.patrimonio.pasivosGroups || []).find(g => g.id === 'cortoPlazo');
-        const legacyItem = cortoGrp && cortoGrp.items ? (cortoGrp.items.find(i => i.id === 'pc_1') || cortoGrp.items[0]) : null;
-        const legacyAmount = legacyItem ? Number(legacyItem.amount || 0) : 0;
-
-        let baseReconstructedSum = 0;
-        cardTotals.forEach(v => { baseReconstructedSum += v.baseAmount; });
-
-        return {
-          cardTotals,
-          unmatchedCommitments,
-          untaggedExpenses: untaggedExpenses.sort((a, b) => (b.date || '').localeCompare(a.date || '')),
-          untaggedExpensesSum,
-          legacyItem,
-          legacyAmount,
-          baseReconstructedSum
-        };
-      }
-
-      function refreshTempReconstructTotals() {
-        if (!lastReconstructionPlan) return;
-        const assignedByCard = new Map();
-        (state.userCards || []).forEach(c => assignedByCard.set(c.id, 0));
-
-        document.querySelectorAll('.temp-exp-assign-select').forEach(sel => {
-          const val = sel.value;
-          const amt = Number(sel.getAttribute('data-exp-amt') || 0);
-          if (val && val !== '__pending__' && val !== '__not_card__' && assignedByCard.has(val)) {
-            assignedByCard.set(val, assignedByCard.get(val) + amt);
-          }
-        });
-
-        let totalReconstructed = 0;
-        lastReconstructionPlan.cardTotals.forEach((v, cardId) => {
-          const added = assignedByCard.get(cardId) || 0;
-          const newTotal = v.baseAmount + added;
-          totalReconstructed += newTotal;
-          const el = document.getElementById(`temp-card-total-${cardId}`);
-          if (el) el.textContent = formatCurrency(newTotal);
-          const subEl = document.getElementById(`temp-card-added-${cardId}`);
-          if (subEl) {
-            subEl.textContent = added > 0 ? `+ ${formatCurrency(added)} asignado manualmente` : '';
-          }
-        });
-
-        const diff = lastReconstructionPlan.legacyAmount - totalReconstructed;
-        const sumEl = document.getElementById('temp-total-reconstructed');
-        if (sumEl) sumEl.textContent = formatCurrency(totalReconstructed);
-        const diffEl = document.getElementById('temp-total-diff');
-        if (diffEl) {
-          diffEl.textContent = formatCurrency(diff);
-          diffEl.className = diff === 0 ? 'text-emerald-400 font-bold' : (diff > 0 ? 'text-amber-300 font-bold' : 'text-red-400 font-bold');
-        }
-        const diffLabelEl = document.getElementById('temp-diff-label-amt');
-        if (diffLabelEl) diffLabelEl.textContent = formatCurrency(Math.max(0, diff));
-        const diffWrap = document.getElementById('temp-diff-assign-wrap');
-        if (diffWrap) diffWrap.classList.toggle('hidden', diff <= 0);
-      }
-
-      document.getElementById('btn-temp-reconstruct-cards')?.addEventListener('click', () => {
-        lastReconstructionPlan = computeCardReconstructionPlan();
-        const body = document.getElementById('temp-reconstruct-body');
-        if (!body || !lastReconstructionPlan) return;
-
-        const rows = [];
-        lastReconstructionPlan.cardTotals.forEach((v, cardId) => {
-          const detailHtml = v.items.length > 0
-            ? `<div class="mt-1.5 pt-1.5 border-t border-zinc-800/80 space-y-0.5 text-[10px] text-zinc-400">${v.items.map(i => `<div class="flex justify-between"><span>${i.month} · ${i.name}</span><span>${formatCurrency(i.amount)}</span></div>`).join('')}</div>`
-            : '';
-          rows.push(`
-            <div class="p-2.5 rounded-xl bg-zinc-900/90 border border-zinc-800">
-              <div class="flex items-center justify-between">
-                <div>
-                  <div class="font-bold text-zinc-100">💳 ${v.cardObj.name}</div>
-                  <div class="text-[10px] text-zinc-500">${v.count} registro(s) automático(s) <span id="temp-card-added-${cardId}" class="text-amber-300 font-semibold ml-1"></span></div>
-                </div>
-                <span id="temp-card-total-${cardId}" class="font-extrabold text-gold">${formatCurrency(v.baseAmount)}</span>
-              </div>
-              ${detailHtml}
-            </div>
-          `);
-        });
-
-        let unmatchedHtml = '';
-        if (lastReconstructionPlan.unmatchedCommitments.length > 0) {
-          unmatchedHtml += `
-            <div class="p-2.5 rounded-xl bg-amber-950/30 border border-amber-500/30 space-y-1">
-              <div class="text-[10px] font-bold text-amber-300 uppercase">Compromisos en Presupuesto sin coincidencia exacta:</div>
-              ${lastReconstructionPlan.unmatchedCommitments.map(u => `<div class="flex justify-between text-[10px] text-zinc-300"><span>${u.month} · ${u.name}</span><strong>${formatCurrency(u.amount)}</strong></div>`).join('')}
-            </div>
-          `;
-        }
-
-        if (lastReconstructionPlan.untaggedExpenses.length > 0) {
-          const cardOptionsHtml = (state.userCards || []).map(c => `<option value="${c.id}">💳 ${c.name}</option>`).join('');
-          const expRows = lastReconstructionPlan.untaggedExpenses.map(e => {
-            const isCardTagged = (e.paymentMethod === 'card_single' || e.paymentMethod === 'card_installments');
-            const badge = isCardTagged
-              ? '<span class="inline-block px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 text-[9px] font-semibold">💳 Tarjeta s/especificar</span>'
-              : '<span class="inline-block px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 text-[9px]">❓ Sin medio guardado</span>';
-            return `
-              <div class="p-2 rounded-lg bg-zinc-950/70 border border-zinc-800/80 space-y-1.5">
-                <div class="flex justify-between items-start gap-2">
-                  <div class="min-w-0">
-                    <div class="text-[11px] font-medium text-zinc-200 truncate">${e.date || ''} · ${e.categoryName || 'Gasto'}${e.note ? ' (' + e.note + ')' : ''}</div>
-                    <div class="mt-0.5">${badge}</div>
-                  </div>
-                  <strong class="shrink-0 text-xs text-zinc-100">${formatCurrency(e.amount)}</strong>
-                </div>
-                <select class="temp-exp-assign-select w-full px-2 py-1.5 rounded-lg bg-zinc-900 border border-zinc-700 text-zinc-100 text-[11px] outline-none focus:border-gold" data-exp-id="${e.id}" data-exp-amt="${e.amount}">
-                  <option value="__pending__">— Pendiente de asignar —</option>
-                  ${cardOptionsHtml}
-                  <option value="__not_card__">💵 Efectivo / Banco (no suma a tarjeta)</option>
-                </select>
-              </div>
-            `;
-          }).join('');
-
-          unmatchedHtml += `
-            <div class="p-2.5 rounded-xl bg-zinc-900 border border-zinc-800 space-y-2">
-              <div class="flex justify-between items-center">
-                <span class="text-[10px] font-bold text-amber-300 uppercase">Asignar gastos históricos (${lastReconstructionPlan.untaggedExpenses.length}):</span>
-                <span class="text-[10px] font-bold text-zinc-300">${formatCurrency(lastReconstructionPlan.untaggedExpensesSum)}</span>
-              </div>
-              <div class="max-h-60 overflow-y-auto space-y-1.5 pr-1">${expRows}</div>
-            </div>
-          `;
-        }
-
-        const initialDiff = lastReconstructionPlan.legacyAmount - lastReconstructionPlan.baseReconstructedSum;
-        const assignSelectHtml = `
-          <div id="temp-diff-assign-wrap" class="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 space-y-1.5 ${initialDiff <= 0 ? 'hidden' : ''}">
-            <label class="block text-[10px] font-bold text-amber-300 uppercase">Saldo restante sin asignar (<span id="temp-diff-label-amt">${formatCurrency(Math.max(0, initialDiff))}</span>):</label>
-            <select id="select-assign-diff-card" class="w-full px-2.5 py-2 rounded-lg bg-zinc-900 border border-zinc-700 text-zinc-100 text-xs outline-none">
-              <option value="__keep_separate__">Dejar aparte como "Saldo Tarjetas (Sin desglosar)"</option>
-              ${(state.userCards || []).map(c => `<option value="${c.id}">Sumar saldo restante a 💳 ${c.name}</option>`).join('')}
-            </select>
-          </div>
-        `;
-
-        body.innerHTML = `
-          <div class="p-2.5 rounded-xl bg-zinc-900 border border-zinc-800 space-y-1 text-[11px]">
-            <div class="flex justify-between"><span>Saldo actual en renglón único:</span><strong class="text-red-400">${formatCurrency(lastReconstructionPlan.legacyAmount)}</strong></div>
-            <div class="flex justify-between"><span>Total reconstruido por tarjeta:</span><strong id="temp-total-reconstructed" class="text-emerald-400">${formatCurrency(lastReconstructionPlan.baseReconstructedSum)}</strong></div>
-            <div class="flex justify-between border-t border-zinc-800 pt-1 mt-1"><span>Diferencia sin asignar:</span><strong id="temp-total-diff" class="text-amber-300">${formatCurrency(initialDiff)}</strong></div>
-          </div>
-          <div class="space-y-1.5">
-            <div class="text-[10px] uppercase tracking-wider text-zinc-400 font-bold">Totales por Tarjeta (en vivo):</div>
-            ${rows.join('')}
-          </div>
-          ${unmatchedHtml}
-          ${assignSelectHtml}
-        `;
-
-        body.querySelectorAll('.temp-exp-assign-select').forEach(sel => {
-          sel.addEventListener('change', refreshTempReconstructTotals);
-        });
-
-        document.getElementById('modal-temp-reconstruct')?.classList.remove('hidden');
-      });
-
-      document.getElementById('btn-close-temp-reconstruct')?.addEventListener('click', () => {
-        document.getElementById('modal-temp-reconstruct')?.classList.add('hidden');
-      });
-      document.getElementById('btn-cancel-temp-reconstruct')?.addEventListener('click', () => {
-        document.getElementById('modal-temp-reconstruct')?.classList.add('hidden');
-      });
-
-      document.getElementById('btn-apply-temp-reconstruct')?.addEventListener('click', () => {
-        if (!lastReconstructionPlan) return;
-        const cleanBudgets = document.getElementById('chk-clean-old-card-commitments')?.checked;
-        const assignTarget = document.getElementById('select-assign-diff-card')?.value || '__keep_separate__';
-
-        let cortoGrp = (state.patrimonio.pasivosGroups || []).find(g => g.id === 'cortoPlazo');
-        if (!cortoGrp) {
-          cortoGrp = { id: 'cortoPlazo', name: 'Corto Plazo (Tarjetas / Deuda cara)', icon: '💳', items: [] };
-          state.patrimonio.pasivosGroups.unshift(cortoGrp);
-        }
-
-        // Procesar asignaciones fila por fila
-        const addedByCard = new Map();
-        (state.userCards || []).forEach(c => addedByCard.set(c.id, 0));
-
-        document.querySelectorAll('.temp-exp-assign-select').forEach(sel => {
-          const expId = sel.getAttribute('data-exp-id');
-          const val = sel.value;
-          const amt = Number(sel.getAttribute('data-exp-amt') || 0);
-          const expObj = (state.expenses || []).find(e => e.id === expId);
-
-          if (val === '__not_card__') {
-            if (expObj && !expObj.paymentMethod) {
-              expObj.paymentMethod = 'cash';
-            }
-          } else if (val && val !== '__pending__' && addedByCard.has(val)) {
-            addedByCard.set(val, addedByCard.get(val) + amt);
-            if (expObj) {
-              expObj.cardId = val;
-              if (!expObj.paymentMethod) expObj.paymentMethod = 'card_single';
-            }
-          }
-        });
-
-        // Crear o actualizar cada renglón nominal por tarjeta
-        let totalAssignedToCards = 0;
-        lastReconstructionPlan.cardTotals.forEach((v, cardId) => {
-          const finalAmt = v.baseAmount + (addedByCard.get(cardId) || 0);
-          totalAssignedToCards += finalAmt;
-          if (finalAmt > 0) {
-            const item = findCardLiabilityItem(v.cardObj, state.patrimonio, true);
-            if (item) {
-              item.amount = finalAmt;
-            }
-          }
-        });
-
-        // Manejar la diferencia restante si la hubiera
-        const rem = Math.max(0, lastReconstructionPlan.legacyAmount - totalAssignedToCards);
-        if (rem > 0 && assignTarget !== '__keep_separate__') {
-          const targetCard = (state.userCards || []).find(c => c.id === assignTarget);
-          if (targetCard) {
-            const item = findCardLiabilityItem(targetCard, state.patrimonio, true);
-            if (item) {
-              item.amount = Number(item.amount || 0) + rem;
-            }
-          }
-          if (lastReconstructionPlan.legacyItem) {
-            cortoGrp.items = cortoGrp.items.filter(it => it.id !== lastReconstructionPlan.legacyItem.id);
-          }
-        } else if (lastReconstructionPlan.legacyItem) {
-          if (rem > 0) {
-            lastReconstructionPlan.legacyItem.name = '💳 Saldo Tarjetas (Sin desglosar)';
-            lastReconstructionPlan.legacyItem.amount = rem;
-          } else {
-            cortoGrp.items = cortoGrp.items.filter(it => it.id !== lastReconstructionPlan.legacyItem.id);
-          }
-        }
-
-        // Limpiar renglones viejos de compromisos de tarjeta en Estructura Fija
-        if (cleanBudgets) {
-          Object.values(state.budgetsByMonth || {}).forEach(b => {
-            if (b.containers && b.containers.fija && Array.isArray(b.containers.fija.items)) {
-              b.containers.fija.items = b.containers.fija.items.filter(it => !it.isAutoCardCommitment);
-            }
-          });
-        }
-
-        state.lastModified = Date.now();
-        StorageService.save(state);
-        document.getElementById('modal-temp-reconstruct')?.classList.add('hidden');
-
-        renderPatrimonio();
-        renderActiveBudget();
-        renderMonthAudit();
-        renderDashboard();
-        showToast('¡Pasivos desglosados por tarjeta con éxito!', '✅');
-      });
 
       // Abrir Historial Completo de Movimientos desde el Tablero o desde la vista de Movimientos
       document.getElementById('btn-dash-go-movements')?.addEventListener('click', () => {
@@ -8418,7 +8215,7 @@
 
         const liquidGrp = state.patrimonio.activosGroups.find(g => g.isLiquid);
         const teoricoLiq = liquidGrp ? liquidGrp.items.reduce((s, i) => s + Number(i.amount || 0), 0) : 0;
-        const cortoGrp = state.patrimonio.pasivosGroups.find(g => g.id === 'cortoPlazo');
+        const cortoGrp = state.patrimonio.pasivosGroups.find(g => g.id === 'tarjetas');
         const teoricoTar = cortoGrp ? cortoGrp.items.reduce((s, i) => s + Number(i.amount || 0), 0) : 0;
 
         const diffLiq = inputRealLiq - teoricoLiq;
@@ -9014,6 +8811,48 @@
         }, 350);
       }
     });
-  </script>
+  
+      function populateLoanReplaceSelect() {
+        const sel = document.getElementById('loan-replace-existing-select');
+        if (!sel) return;
+        let opts = '<option value="">— No, crear deuda nueva en Impuestos/Otros —</option>';
+        (state.patrimonio.pasivosGroups || []).forEach(g => {
+          if (g.id === 'impuestos' || g.id === 'prestamos') {
+            (g.items || []).forEach(it => {
+              if (!it.loanId) {
+                opts += `<option value="${g.id}|${it.id}">${g.icon} ${it.name} (${formatCurrency(it.amount)})</option>`;
+              }
+            });
+          }
+        });
+        sel.innerHTML = opts;
+      }
+
+      document.getElementById('btn-mode-loan-cash')?.addEventListener('click', () => {
+        isPaymentPlanMode = false;
+        document.getElementById('btn-mode-loan-cash').className = 'py-1.5 px-2 rounded-lg font-bold bg-amber-500 text-zinc-950 text-[11px] transition cursor-pointer';
+        document.getElementById('btn-mode-loan-plan').className = 'py-1.5 px-2 rounded-lg font-semibold text-zinc-400 hover:text-zinc-200 text-[11px] transition cursor-pointer';
+        document.getElementById('loan-replace-existing-wrap')?.classList.add('hidden');
+        document.getElementById('loan-dest-col-wrap')?.classList.remove('hidden');
+        const lblEnt = document.getElementById('label-loan-entity');
+        if (lblEnt) lblEnt.textContent = 'Origen / Entidad que otorga:';
+        const lblCap = document.getElementById('label-loan-capital');
+        if (lblCap) lblCap.textContent = 'Capital Recibido Hoy ($):';
+      });
+
+      document.getElementById('btn-mode-loan-plan')?.addEventListener('click', () => {
+        isPaymentPlanMode = true;
+        populateLoanReplaceSelect();
+        document.getElementById('btn-mode-loan-plan').className = 'py-1.5 px-2 rounded-lg font-bold bg-amber-500 text-zinc-950 text-[11px] transition cursor-pointer';
+        document.getElementById('btn-mode-loan-cash').className = 'py-1.5 px-2 rounded-lg font-semibold text-zinc-400 hover:text-zinc-200 text-[11px] transition cursor-pointer';
+        document.getElementById('loan-replace-existing-wrap')?.classList.remove('hidden');
+        document.getElementById('loan-dest-col-wrap')?.classList.add('hidden');
+        const lblEnt = document.getElementById('label-loan-entity');
+        if (lblEnt) lblEnt.textContent = 'Organismo / Acreedor (ej. ARCA, GCBA):';
+        const lblCap = document.getElementById('label-loan-capital');
+        if (lblCap) lblCap.textContent = 'Deuda Regularizada ($):';
+      });
+
+</script>
 </body>
 </html>
