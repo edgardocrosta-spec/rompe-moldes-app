@@ -1249,7 +1249,7 @@
             🏦 Préstamo Recibido
           </button>
           <button type="button" id="btn-mode-loan-plan" class="py-1.5 px-2 rounded-lg font-semibold text-zinc-400 hover:text-zinc-200 text-[11px] transition cursor-pointer">
-            🧾 Plan de Pagos (ARCA/ABL)
+            🧾 Deuda Previa / Plan de Pagos
           </button>
         </div>
 
@@ -1459,14 +1459,56 @@
           </p>
         </div>
 
-        <!-- Vista previa en vivo del Disparo Múltiple (5 impactos) -->
-        <div id="loan-impact-preview" class="p-3 rounded-2xl bg-amber-950/20 border border-amber-500/30 space-y-1 text-[10px] text-zinc-300">
+        <!-- Paso 3B: Anticipo Opcional y Medio de Pago / Débito Automático -->
+        <div class="p-3 rounded-2xl bg-zinc-900/90 border border-zinc-800 space-y-2.5">
+          <div class="grid grid-cols-2 gap-2">
+            <div class="space-y-1">
+              <label class="text-zinc-300 font-medium text-[11px]">Anticipo / Pago Inicial ($):</label>
+              <input type="number" step="any" inputmode="decimal" id="loan-input-downpayment" value="0" placeholder="0" class="w-full bg-zinc-800 border border-zinc-700 rounded-xl p-2 text-zinc-100 text-xs focus:outline-none">
+            </div>
+            <div id="loan-downpayment-src-wrap" class="space-y-1 hidden">
+              <label class="text-zinc-300 font-medium text-[11px]">¿Salió de tu caja hoy?:</label>
+              <select id="loan-downpayment-source" class="w-full bg-zinc-800 border border-zinc-700 rounded-xl p-2 text-zinc-100 text-[11px] focus:outline-none">
+                <option value="none">No descontar (ya pagado)</option>
+                <option value="bank">🏦 Descontar de Banco</option>
+                <option value="cash">💵 Descontar de Efectivo</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-2 items-end">
+            <div class="space-y-1">
+              <label class="text-zinc-300 font-medium text-[11px]">Medio de pago de las cuotas:</label>
+              <select id="loan-quota-paymethod" class="w-full bg-zinc-800 border border-zinc-700 rounded-xl p-2 text-zinc-100 text-[11px] focus:outline-none">
+                <option value="manual">💵 Manual / Efectivo</option>
+                <option value="bank">🏦 Cuenta Bancaria</option>
+              </select>
+            </div>
+            <div id="loan-autodebit-wrap" class="hidden flex items-center space-x-2 pb-1">
+              <label class="flex items-center space-x-1.5 text-[11px] text-amber-300 font-semibold cursor-pointer">
+                <input type="checkbox" id="loan-chk-autodebit" class="rounded border-zinc-600 bg-zinc-800 text-amber-500">
+                <span>🔄 Débito auto día</span>
+              </label>
+              <input type="number" id="loan-autodebit-day" min="1" max="31" value="10" class="w-12 bg-zinc-800 border border-zinc-700 rounded-lg p-1 text-center text-zinc-100 text-[11px]">
+            </div>
+          </div>
+        </div>
+
+        <!-- Vista previa en vivo del Disparo Múltiple + Cuotas Editables -->
+        <div id="loan-impact-preview" class="p-3 rounded-2xl bg-amber-950/20 border border-amber-500/30 space-y-2 text-[10px] text-zinc-300">
           <div class="font-bold text-amber-300 flex items-center justify-between">
             <span>⚡ Vista Previa del Disparo Múltiple (5 Flujos)</span>
             <span id="loan-preview-total-debt" class="text-red-400 font-extrabold">Deuda: $0</span>
           </div>
           <div id="loan-preview-summary-text" class="text-zinc-400 leading-relaxed">
             Completá el capital recibido y las condiciones para previsualizar el impacto en Caja, Presupuesto y Patrimonio.
+          </div>
+          <div id="loan-editable-schedule-wrap" class="hidden pt-1.5 border-t border-zinc-800/80 space-y-1.5">
+            <div class="flex justify-between items-center text-[10px] text-amber-300 font-bold uppercase">
+              <span>Detalle de cuotas (editables):</span>
+              <span class="text-zinc-500 font-normal normal-case">Tocá cualquier monto para ajustar</span>
+            </div>
+            <div id="loan-editable-schedule-list" class="max-h-40 overflow-y-auto space-y-1 pr-1"></div>
           </div>
         </div>
 
@@ -2490,7 +2532,19 @@
       let executedCount = 0;
 
       state.recurringDebits.forEach(d => {
-        const amt = Number(d.amount || 0);
+        if (d.loanId && Array.isArray(d.validMonths) && !d.validMonths.includes(currentMonthKey)) return;
+        let amt = Number(d.amount || 0);
+        let linkedLoanBudgetItem = null;
+        if (d.loanId) {
+          const mb = getBudgetForMonth(currentMonthKey);
+          const fItems = (mb && mb.containers && mb.containers.fija && mb.containers.fija.items) || [];
+          linkedLoanBudgetItem = fItems.find(it => it.loanId === d.loanId) || null;
+          if (linkedLoanBudgetItem) {
+            amt = Number(linkedLoanBudgetItem.budget || amt);
+          } else {
+            return;
+          }
+        }
         if (amt <= 0) return;
 
         // Si el débito no tiene día configurado, asume día 1 del mes por defecto
@@ -2514,9 +2568,13 @@
 
         // Resolver nombre del renglón presupuestario vinculado
         let budgetItemName = d.name;
+        let resolvedCategoryId = d.categoryId || d.budgetItemId || ('deb_' + d.id);
         const monthBudg = getBudgetForMonth(currentMonthKey);
         const cntObj = monthBudg && monthBudg.containers ? monthBudg.containers[d.containerId] : null;
-        if (cntObj && cntObj.items) {
+        if (linkedLoanBudgetItem) {
+          budgetItemName = linkedLoanBudgetItem.name;
+          resolvedCategoryId = linkedLoanBudgetItem.id;
+        } else if (cntObj && cntObj.items) {
           const foundIt = cntObj.items.find(it => it.id === d.budgetItemId);
           if (foundIt) budgetItemName = foundIt.name;
         }
@@ -6386,6 +6444,7 @@
     // ==============================================
     let currentLoanModality = 'rapido';
     let isPaymentPlanMode = false;
+    let customLoanScheduleEdits = null;
     let currentLoanDestination = 'bank';
     let currentRapidoSubmode = '1pago';
     let currentPersonasSubmode = 'flexible';
@@ -6525,9 +6584,27 @@
         }
       }
 
+      const downpayment = Math.max(0, parseFloat(document.getElementById('loan-input-downpayment')?.value || '0') || 0);
+      if (downpayment > 0 && schedule.length > 0 && totalDebt > 0) {
+        const netToFinance = Math.max(0, totalDebt - downpayment);
+        const ratio = netToFinance / totalDebt;
+        schedule.forEach(s => { s.amount = Math.round(s.amount * ratio); });
+        totalDebt = schedule.reduce((sum, s) => sum + Number(s.amount || 0), 0);
+      }
+
+      // Aplicar ajustes manuales por cuota si el usuario editó alguna cuota en la vista previa
+      if (Array.isArray(customLoanScheduleEdits) && customLoanScheduleEdits.length === schedule.length) {
+        schedule.forEach((s, idx) => {
+          const edited = Number(customLoanScheduleEdits[idx]);
+          if (!isNaN(edited) && edited >= 0) s.amount = edited;
+        });
+        totalDebt = schedule.reduce((sum, s) => sum + Number(s.amount || 0), 0);
+      }
+
       return {
         entity,
         capital,
+        downpayment,
         totalDebt,
         schedule,
         modalityLabel,
@@ -6764,7 +6841,11 @@
         }
       }
 
-      const targetPasivoGroupId = isPaymentPlanMode ? 'impuestos' : 'prestamos';
+      let targetPasivoGroupId = isPaymentPlanMode ? 'impuestos' : 'prestamos';
+      if (replaceExistingVal) {
+        const [repGrpId] = replaceExistingVal.split('|');
+        if (repGrpId === 'prestamos' || repGrpId === 'impuestos') targetPasivoGroupId = repGrpId;
+      }
       let pasivoGrp = state.patrimonio.pasivosGroups.find(g => g.id === targetPasivoGroupId) || state.patrimonio.pasivosGroups[1] || state.patrimonio.pasivosGroups[0];
       if (pasivoGrp) {
         pasivoGrp.items.push({
@@ -6800,6 +6881,56 @@
           });
         }
       });
+
+      // 5B. Si hubo Anticipo pagado hoy desde caja/banco, descontarlo
+      const dpSrc = document.getElementById('loan-downpayment-source')?.value || 'none';
+      if (data.downpayment > 0 && dpSrc !== 'none') {
+        const liqGrp = state.patrimonio.activosGroups.find(g => g.isLiquid || g.id === 'liquidos');
+        if (liqGrp && liqGrp.items.length > 0) {
+          if (dpSrc === 'cash') {
+            const ef = liqGrp.items.find(i => i.name.toLowerCase().includes('efectivo')) || liqGrp.items[0];
+            ef.amount = Math.max(0, Number(ef.amount || 0) - data.downpayment);
+          } else {
+            liqGrp.items[0].amount = Math.max(0, Number(liqGrp.items[0].amount || 0) - data.downpayment);
+          }
+        }
+        state.expenses.push({
+          id: 'mov_dp_' + Date.now(),
+          type: 'expense',
+          date: todayStr,
+          amount: data.downpayment,
+          containerId: 'fija',
+          categoryId: 'dp_' + loanId,
+          categoryName: `Anticipo ${data.entity}`,
+          paymentMethod: 'cash',
+          loanId: loanId,
+          deviceId: CloudVaultService.getDeviceId(),
+          originRole: CloudVaultService.getEffectiveRole(),
+          note: `Anticipo inicial (${dpSrc === 'bank' ? 'Banco' : 'Efectivo'})`,
+          timestamp: Date.now(),
+          updatedAt: Date.now()
+        });
+      }
+
+      // 5C. Si activó Débito Automático para las cuotas, crear recurringDebit acotado a los meses del cronograma
+      const quotaPayMethod = document.getElementById('loan-quota-paymethod')?.value || 'manual';
+      const autoDebitChk = document.getElementById('loan-chk-autodebit')?.checked;
+      if (autoDebitChk && quotaPayMethod !== 'manual' && data.schedule.length > 0) {
+        const debitDay = Math.min(31, Math.max(1, parseInt(document.getElementById('loan-autodebit-day')?.value || '10', 10)));
+        if (!state.recurringDebits) state.recurringDebits = [];
+        state.recurringDebits.push({
+          id: 'deb_loan_' + loanId,
+          name: `Cuota ${data.entity}`,
+          amount: data.schedule[0]?.amount || 0,
+          cardId: quotaPayMethod,
+          dayOfMonth: debitDay,
+          containerId: 'fija',
+          categoryId: '',
+          loanId: loanId,
+          validMonths: data.schedule.map(s => s.monthKey)
+        });
+      }
+      customLoanScheduleEdits = null;
 
       // Guardar en state.activeLoans para seguimiento y cancelación asistida
       if (!state.activeLoans) state.activeLoans = [];
@@ -7000,6 +7131,9 @@
                         <button type="button" class="btn-toggle-exigible px-1.5 py-0.5 rounded-md text-[9px] font-semibold transition cursor-pointer ${it.isExigible ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40' : 'bg-zinc-800 text-zinc-400 border border-zinc-700 hover:text-zinc-200'}" data-group-index="${grpIdx}" data-item-index="${itIdx}" title="Tocar para alternar si vence este mes y afecta Paz Mental">
                           ${it.isExigible ? '⚡ Exigible este mes' : '⏳ Sin vencimiento'}
                         </button>
+                        <button type="button" class="btn-define-installments px-1.5 py-0.5 rounded-md text-[9px] font-semibold bg-gold/15 text-gold border border-gold/30 hover:bg-gold/25 transition cursor-pointer" data-group-id="${g.id}" data-item-id="${it.id}" data-item-name="${it.name}" data-item-amount="${it.amount}" title="Definir plan de cuotas sin registrar ingreso de dinero">
+                          📅 Cuotas
+                        </button>
                       ` : (it.loanId ? `<span class="px-1.5 py-0.5 rounded-md bg-emerald-500/15 text-emerald-400 text-[9px] font-semibold">📅 En cuotas</span>` : '')}
                     </div>
                   </div>
@@ -7020,6 +7154,15 @@
             </div>
           `;
           liabContainer.appendChild(grpCard);
+        });
+        liabContainer.querySelectorAll('.btn-define-installments').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const gId = btn.getAttribute('data-group-id');
+            const iId = btn.getAttribute('data-item-id');
+            const iName = (btn.getAttribute('data-item-name') || '').replace(/^[🏦🧾⚡💳\s]+/, '').trim();
+            const iAmt = Number(btn.getAttribute('data-item-amount') || 0);
+            openLoanModalForExistingDebt(gId, iId, iName, iAmt);
+          });
         });
         liabContainer.querySelectorAll('.btn-toggle-exigible').forEach(btn => {
           btn.addEventListener('click', () => {
@@ -7345,6 +7488,31 @@
       const directPat = document.getElementById('direct-report-patrimonio-summary');
       if (directPat && patSummary) {
         directPat.innerHTML = patSummary.innerHTML;
+      }
+    
+      const schedWrap = document.getElementById('loan-editable-schedule-wrap');
+      const schedList = document.getElementById('loan-editable-schedule-list');
+      if (schedWrap && schedList) {
+        if (data.schedule && data.schedule.length > 0 && data.capital > 0) {
+          schedWrap.classList.remove('hidden');
+          schedList.innerHTML = data.schedule.map((slot, idx) => `
+            <div class="flex items-center justify-between gap-2 bg-zinc-900/90 border border-zinc-800 rounded-lg px-2 py-1">
+              <span class="text-[10px] text-zinc-300 truncate">${slot.monthKey} · Cuota ${idx + 1}/${data.schedule.length}</span>
+              <input type="number" step="any" inputmode="decimal" class="loan-editable-quota-input w-24 bg-zinc-950 border border-zinc-700 rounded-md px-2 py-0.5 text-right text-[11px] font-bold text-amber-300 outline-none focus:border-gold" data-idx="${idx}" value="${slot.amount}">
+            </div>
+          `).join('');
+          schedList.querySelectorAll('.loan-editable-quota-input').forEach(inp => {
+            inp.addEventListener('change', () => {
+              const allVals = Array.from(schedList.querySelectorAll('.loan-editable-quota-input')).map(el => parseFloat(el.value || '0') || 0);
+              customLoanScheduleEdits = allVals;
+              const newSum = allVals.reduce((a, b) => a + b, 0);
+              const dEl = document.getElementById('loan-preview-total-debt');
+              if (dEl) dEl.textContent = `Deuda Total: ${formatCurrency(newSum)}`;
+            });
+          });
+        } else {
+          schedWrap.classList.add('hidden');
+        }
       }
     }
 
@@ -8812,6 +8980,54 @@
       }
     });
   
+      
+      function populateLoanQuotaPayMethods() {
+        const sel = document.getElementById('loan-quota-paymethod');
+        if (!sel) return;
+        let opts = '<option value="manual">💵 Manual / Efectivo</option><option value="bank">🏦 Cuenta Bancaria</option>';
+        (state.userCards || []).forEach(c => {
+          opts += `<option value="${c.id}">💳 ${c.name}</option>`;
+        });
+        sel.innerHTML = opts;
+      }
+
+      function openLoanModalForExistingDebt(groupId, itemId, itemName, itemAmount) {
+        customLoanScheduleEdits = null;
+        populateLoanQuotaPayMethods();
+        document.getElementById('modal-loan-manager')?.classList.remove('hidden');
+        document.getElementById('subtab-loan-new')?.click();
+        document.getElementById('btn-mode-loan-plan')?.click();
+
+        const repSel = document.getElementById('loan-replace-existing-select');
+        if (repSel) repSel.value = `${groupId}|${itemId}`;
+        const entInp = document.getElementById('loan-input-entity');
+        if (entInp) entInp.value = itemName || '';
+        const capInp = document.getElementById('loan-input-capital');
+        if (capInp) capInp.value = itemAmount || '';
+        const dpInp = document.getElementById('loan-input-downpayment');
+        if (dpInp) dpInp.value = '0';
+        document.getElementById('loan-downpayment-src-wrap')?.classList.add('hidden');
+        updateLoanImpactPreview();
+      }
+
+      document.getElementById('loan-input-downpayment')?.addEventListener('input', (e) => {
+        customLoanScheduleEdits = null;
+        const val = parseFloat(e.target.value || '0') || 0;
+        document.getElementById('loan-downpayment-src-wrap')?.classList.toggle('hidden', val <= 0);
+        updateLoanImpactPreview();
+      });
+
+      document.getElementById('loan-quota-paymethod')?.addEventListener('change', (e) => {
+        const v = e.target.value;
+        document.getElementById('loan-autodebit-wrap')?.classList.toggle('hidden', v === 'manual');
+      });
+
+      // Resetear ediciones manuales de cuotas si cambian los inputs base del préstamo
+      ['loan-input-capital', 'loan-rapido-total', 'loan-rapido-count', 'loan-cuotas-count', 'loan-cuotas-amount', 'loan-adelanto-count', 'loan-adelanto-installment-amount'].forEach(id => {
+        document.getElementById(id)?.addEventListener('input', () => { customLoanScheduleEdits = null; });
+      });
+
+
       function populateLoanReplaceSelect() {
         const sel = document.getElementById('loan-replace-existing-select');
         if (!sel) return;
