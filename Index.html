@@ -7290,15 +7290,14 @@
       let lastReconstructionPlan = null;
 
       function computeCardReconstructionPlan() {
-        const cardTotals = new Map(); // cardId -> { cardObj, amount, count, items: [] }
+        const cardTotals = new Map(); // cardId -> { cardObj, baseAmount, count, items: [] }
         (state.userCards || []).forEach(c => {
-          cardTotals.set(c.id, { cardObj: c, amount: 0, count: 0, items: [] });
+          cardTotals.set(c.id, { cardObj: c, baseAmount: 0, count: 0, items: [] });
         });
 
         const unmatchedCommitments = [];
-        const matchedCommitmentKeys = new Set();
 
-        // 1. Escanear TODOS los compromisos automáticos en presupuestos (isAutoCardCommitment)
+        // 1. Escanear compromisos automáticos en presupuestos (isAutoCardCommitment)
         Object.entries(state.budgetsByMonth || {}).forEach(([mKey, b]) => {
           const fijaItems = (b.containers && b.containers.fija && b.containers.fija.items) || [];
           fijaItems.forEach(it => {
@@ -7311,10 +7310,9 @@
               const cName = (c.name || '').toLowerCase().trim();
               if (cName && nm.includes(cName)) {
                 const entry = cardTotals.get(c.id);
-                entry.amount += amt;
+                entry.baseAmount += amt;
                 entry.count += 1;
                 entry.items.push({ month: mKey, name: it.name, amount: amt });
-                matchedCommitmentKeys.add(`${mKey}|${it.name}`);
                 matched = true;
                 break;
               }
@@ -7325,8 +7323,7 @@
           });
         });
 
-        // 2. Escanear movimientos (state.expenses) que puedan explicar parte de la diferencia
-        // (ej. movimientos con cardId sin compromiso, o movimientos recientes sin cardId que no son efectivo/débito)
+        // 2. Escanear movimientos (state.expenses)
         const untaggedExpenses = [];
         let untaggedExpensesSum = 0;
         (state.expenses || []).forEach(exp => {
@@ -7337,13 +7334,12 @@
             if (cardTotals.has(exp.cardId) && !exp.isAutoDebit) {
               const entry = cardTotals.get(exp.cardId);
               if (entry.count === 0) {
-                entry.amount += amt;
+                entry.baseAmount += amt;
                 entry.count += 1;
                 entry.items.push({ month: (exp.date || '').slice(0, 7), name: `${exp.categoryName || 'Gasto'} (${exp.note || 'sin nota'})`, amount: amt });
               }
             }
           } else if (!exp.paymentMethod || exp.paymentMethod === 'card_single' || exp.paymentMethod === 'card_installments') {
-            // Movimientos cargados antes de guardar paymentMethod/cardId
             if (!exp.isAutoDebit && exp.paymentMethod !== 'cash' && exp.paymentMethod !== 'bank') {
               untaggedExpenses.push(exp);
               untaggedExpensesSum += amt;
@@ -7356,8 +7352,8 @@
         const legacyItem = cortoGrp && cortoGrp.items ? (cortoGrp.items.find(i => i.id === 'pc_1') || cortoGrp.items[0]) : null;
         const legacyAmount = legacyItem ? Number(legacyItem.amount || 0) : 0;
 
-        let reconstructedSum = 0;
-        cardTotals.forEach(v => { reconstructedSum += v.amount; });
+        let baseReconstructedSum = 0;
+        cardTotals.forEach(v => { baseReconstructedSum += v.baseAmount; });
 
         return {
           cardTotals,
@@ -7366,9 +7362,48 @@
           untaggedExpensesSum,
           legacyItem,
           legacyAmount,
-          reconstructedSum,
-          unmatchedDiff: legacyAmount - reconstructedSum
+          baseReconstructedSum
         };
+      }
+
+      function refreshTempReconstructTotals() {
+        if (!lastReconstructionPlan) return;
+        const assignedByCard = new Map();
+        (state.userCards || []).forEach(c => assignedByCard.set(c.id, 0));
+
+        document.querySelectorAll('.temp-exp-assign-select').forEach(sel => {
+          const val = sel.value;
+          const amt = Number(sel.getAttribute('data-exp-amt') || 0);
+          if (val && val !== '__pending__' && val !== '__not_card__' && assignedByCard.has(val)) {
+            assignedByCard.set(val, assignedByCard.get(val) + amt);
+          }
+        });
+
+        let totalReconstructed = 0;
+        lastReconstructionPlan.cardTotals.forEach((v, cardId) => {
+          const added = assignedByCard.get(cardId) || 0;
+          const newTotal = v.baseAmount + added;
+          totalReconstructed += newTotal;
+          const el = document.getElementById(`temp-card-total-${cardId}`);
+          if (el) el.textContent = formatCurrency(newTotal);
+          const subEl = document.getElementById(`temp-card-added-${cardId}`);
+          if (subEl) {
+            subEl.textContent = added > 0 ? `+ ${formatCurrency(added)} asignado manualmente` : '';
+          }
+        });
+
+        const diff = lastReconstructionPlan.legacyAmount - totalReconstructed;
+        const sumEl = document.getElementById('temp-total-reconstructed');
+        if (sumEl) sumEl.textContent = formatCurrency(totalReconstructed);
+        const diffEl = document.getElementById('temp-total-diff');
+        if (diffEl) {
+          diffEl.textContent = formatCurrency(diff);
+          diffEl.className = diff === 0 ? 'text-emerald-400 font-bold' : (diff > 0 ? 'text-amber-300 font-bold' : 'text-red-400 font-bold');
+        }
+        const diffLabelEl = document.getElementById('temp-diff-label-amt');
+        if (diffLabelEl) diffLabelEl.textContent = formatCurrency(Math.max(0, diff));
+        const diffWrap = document.getElementById('temp-diff-assign-wrap');
+        if (diffWrap) diffWrap.classList.toggle('hidden', diff <= 0);
       }
 
       document.getElementById('btn-temp-reconstruct-cards')?.addEventListener('click', () => {
@@ -7377,7 +7412,7 @@
         if (!body || !lastReconstructionPlan) return;
 
         const rows = [];
-        lastReconstructionPlan.cardTotals.forEach(v => {
+        lastReconstructionPlan.cardTotals.forEach((v, cardId) => {
           const detailHtml = v.items.length > 0
             ? `<div class="mt-1.5 pt-1.5 border-t border-zinc-800/80 space-y-0.5 text-[10px] text-zinc-400">${v.items.map(i => `<div class="flex justify-between"><span>${i.month} · ${i.name}</span><span>${formatCurrency(i.amount)}</span></div>`).join('')}</div>`
             : '';
@@ -7386,16 +7421,14 @@
               <div class="flex items-center justify-between">
                 <div>
                   <div class="font-bold text-zinc-100">💳 ${v.cardObj.name}</div>
-                  <div class="text-[10px] text-zinc-500">${v.count} registro(s) detectado(s)</div>
+                  <div class="text-[10px] text-zinc-500">${v.count} registro(s) automático(s) <span id="temp-card-added-${cardId}" class="text-amber-300 font-semibold ml-1"></span></div>
                 </div>
-                <span class="font-extrabold text-gold">${formatCurrency(v.amount)}</span>
+                <span id="temp-card-total-${cardId}" class="font-extrabold text-gold">${formatCurrency(v.baseAmount)}</span>
               </div>
               ${detailHtml}
             </div>
           `);
         });
-
-        const diff = lastReconstructionPlan.unmatchedDiff;
 
         let unmatchedHtml = '';
         if (lastReconstructionPlan.unmatchedCommitments.length > 0) {
@@ -7408,47 +7441,69 @@
         }
 
         if (lastReconstructionPlan.untaggedExpenses.length > 0) {
-          const expRows = lastReconstructionPlan.untaggedExpenses.map(e => `
-            <div class="flex justify-between text-[10px] text-zinc-300 py-0.5 border-b border-zinc-800/60 last:border-0">
-              <span class="truncate pr-2">${e.date || ''} · ${e.categoryName || 'Gasto'}${e.note ? ' (' + e.note + ')' : ''}</span>
-              <strong class="shrink-0 text-zinc-100">${formatCurrency(e.amount)}</strong>
-            </div>
-          `).join('');
-          unmatchedHtml += `
-            <div class="p-2.5 rounded-xl bg-zinc-900 border border-zinc-800 space-y-1.5">
-              <div class="flex justify-between items-center">
-                <span class="text-[10px] font-bold text-zinc-400 uppercase">Gastos históricos sin etiqueta de medio (${lastReconstructionPlan.untaggedExpenses.length}):</span>
-                <span class="text-[10px] font-bold text-amber-300">${formatCurrency(lastReconstructionPlan.untaggedExpensesSum)}</span>
+          const cardOptionsHtml = (state.userCards || []).map(c => `<option value="${c.id}">💳 ${c.name}</option>`).join('');
+          const expRows = lastReconstructionPlan.untaggedExpenses.map(e => {
+            const isCardTagged = (e.paymentMethod === 'card_single' || e.paymentMethod === 'card_installments');
+            const badge = isCardTagged
+              ? '<span class="inline-block px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 text-[9px] font-semibold">💳 Tarjeta s/especificar</span>'
+              : '<span class="inline-block px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 text-[9px]">❓ Sin medio guardado</span>';
+            return `
+              <div class="p-2 rounded-lg bg-zinc-950/70 border border-zinc-800/80 space-y-1.5">
+                <div class="flex justify-between items-start gap-2">
+                  <div class="min-w-0">
+                    <div class="text-[11px] font-medium text-zinc-200 truncate">${e.date || ''} · ${e.categoryName || 'Gasto'}${e.note ? ' (' + e.note + ')' : ''}</div>
+                    <div class="mt-0.5">${badge}</div>
+                  </div>
+                  <strong class="shrink-0 text-xs text-zinc-100">${formatCurrency(e.amount)}</strong>
+                </div>
+                <select class="temp-exp-assign-select w-full px-2 py-1.5 rounded-lg bg-zinc-900 border border-zinc-700 text-zinc-100 text-[11px] outline-none focus:border-gold" data-exp-id="${e.id}" data-exp-amt="${e.amount}">
+                  <option value="__pending__">— Pendiente de asignar —</option>
+                  ${cardOptionsHtml}
+                  <option value="__not_card__">💵 Efectivo / Banco (no suma a tarjeta)</option>
+                </select>
               </div>
-              <div class="max-h-36 overflow-y-auto space-y-0.5 pr-1">${expRows}</div>
-              <p class="text-[9px] text-zinc-500 leading-tight">Nota: si cargaste efectivo/débito antes de que existiera el selector de medio, también aparecen aquí. Lo que no esté en esta lista corresponde al saldo inicial que ya tenía tu renglón de tarjeta.</p>
+            `;
+          }).join('');
+
+          unmatchedHtml += `
+            <div class="p-2.5 rounded-xl bg-zinc-900 border border-zinc-800 space-y-2">
+              <div class="flex justify-between items-center">
+                <span class="text-[10px] font-bold text-amber-300 uppercase">Asignar gastos históricos (${lastReconstructionPlan.untaggedExpenses.length}):</span>
+                <span class="text-[10px] font-bold text-zinc-300">${formatCurrency(lastReconstructionPlan.untaggedExpensesSum)}</span>
+              </div>
+              <div class="max-h-60 overflow-y-auto space-y-1.5 pr-1">${expRows}</div>
             </div>
           `;
         }
 
-        const assignSelectHtml = diff > 0 ? `
-          <div class="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 space-y-1.5">
-            <label class="block text-[10px] font-bold text-amber-300 uppercase">¿A qué tarjeta querés asignar la diferencia de ${formatCurrency(diff)}?</label>
+        const initialDiff = lastReconstructionPlan.legacyAmount - lastReconstructionPlan.baseReconstructedSum;
+        const assignSelectHtml = `
+          <div id="temp-diff-assign-wrap" class="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 space-y-1.5 ${initialDiff <= 0 ? 'hidden' : ''}">
+            <label class="block text-[10px] font-bold text-amber-300 uppercase">Saldo restante sin asignar (<span id="temp-diff-label-amt">${formatCurrency(Math.max(0, initialDiff))}</span>):</label>
             <select id="select-assign-diff-card" class="w-full px-2.5 py-2 rounded-lg bg-zinc-900 border border-zinc-700 text-zinc-100 text-xs outline-none">
               <option value="__keep_separate__">Dejar aparte como "Saldo Tarjetas (Sin desglosar)"</option>
-              ${(state.userCards || []).map(c => `<option value="${c.id}">Sumar a 💳 ${c.name}</option>`).join('')}
+              ${(state.userCards || []).map(c => `<option value="${c.id}">Sumar saldo restante a 💳 ${c.name}</option>`).join('')}
             </select>
           </div>
-        ` : '';
+        `;
 
         body.innerHTML = `
           <div class="p-2.5 rounded-xl bg-zinc-900 border border-zinc-800 space-y-1 text-[11px]">
             <div class="flex justify-between"><span>Saldo actual en renglón único:</span><strong class="text-red-400">${formatCurrency(lastReconstructionPlan.legacyAmount)}</strong></div>
-            <div class="flex justify-between"><span>Total reconstruido por tarjeta:</span><strong class="text-emerald-400">${formatCurrency(lastReconstructionPlan.reconstructedSum)}</strong></div>
-            ${diff !== 0 ? `<div class="flex justify-between border-t border-zinc-800 pt-1 mt-1"><span>Diferencia sin etiqueta de tarjeta:</span><strong class="text-amber-300">${formatCurrency(diff)}</strong></div>` : ''}
+            <div class="flex justify-between"><span>Total reconstruido por tarjeta:</span><strong id="temp-total-reconstructed" class="text-emerald-400">${formatCurrency(lastReconstructionPlan.baseReconstructedSum)}</strong></div>
+            <div class="flex justify-between border-t border-zinc-800 pt-1 mt-1"><span>Diferencia sin asignar:</span><strong id="temp-total-diff" class="text-amber-300">${formatCurrency(initialDiff)}</strong></div>
           </div>
           <div class="space-y-1.5">
-            <div class="text-[10px] uppercase tracking-wider text-zinc-400 font-bold">Desglose Detectado por Tarjeta:</div>
+            <div class="text-[10px] uppercase tracking-wider text-zinc-400 font-bold">Totales por Tarjeta (en vivo):</div>
             ${rows.join('')}
           </div>
           ${unmatchedHtml}
           ${assignSelectHtml}
         `;
+
+        body.querySelectorAll('.temp-exp-assign-select').forEach(sel => {
+          sel.addEventListener('change', refreshTempReconstructTotals);
+        });
 
         document.getElementById('modal-temp-reconstruct')?.classList.remove('hidden');
       });
@@ -7471,18 +7526,44 @@
           state.patrimonio.pasivosGroups.unshift(cortoGrp);
         }
 
-        // Crear o actualizar cada renglón nominal por tarjeta
-        lastReconstructionPlan.cardTotals.forEach(v => {
-          if (v.amount > 0) {
-            const item = findCardLiabilityItem(v.cardObj, state.patrimonio, true);
-            if (item) {
-              item.amount = v.amount;
+        // Procesar asignaciones fila por fila
+        const addedByCard = new Map();
+        (state.userCards || []).forEach(c => addedByCard.set(c.id, 0));
+
+        document.querySelectorAll('.temp-exp-assign-select').forEach(sel => {
+          const expId = sel.getAttribute('data-exp-id');
+          const val = sel.value;
+          const amt = Number(sel.getAttribute('data-exp-amt') || 0);
+          const expObj = (state.expenses || []).find(e => e.id === expId);
+
+          if (val === '__not_card__') {
+            if (expObj && !expObj.paymentMethod) {
+              expObj.paymentMethod = 'cash';
+            }
+          } else if (val && val !== '__pending__' && addedByCard.has(val)) {
+            addedByCard.set(val, addedByCard.get(val) + amt);
+            if (expObj) {
+              expObj.cardId = val;
+              if (!expObj.paymentMethod) expObj.paymentMethod = 'card_single';
             }
           }
         });
 
-        // Manejar la diferencia sin etiqueta según elección del usuario
-        const rem = Math.max(0, lastReconstructionPlan.unmatchedDiff);
+        // Crear o actualizar cada renglón nominal por tarjeta
+        let totalAssignedToCards = 0;
+        lastReconstructionPlan.cardTotals.forEach((v, cardId) => {
+          const finalAmt = v.baseAmount + (addedByCard.get(cardId) || 0);
+          totalAssignedToCards += finalAmt;
+          if (finalAmt > 0) {
+            const item = findCardLiabilityItem(v.cardObj, state.patrimonio, true);
+            if (item) {
+              item.amount = finalAmt;
+            }
+          }
+        });
+
+        // Manejar la diferencia restante si la hubiera
+        const rem = Math.max(0, lastReconstructionPlan.legacyAmount - totalAssignedToCards);
         if (rem > 0 && assignTarget !== '__keep_separate__') {
           const targetCard = (state.userCards || []).find(c => c.id === assignTarget);
           if (targetCard) {
@@ -7503,7 +7584,7 @@
           }
         }
 
-        // Limpiar renglones viejos de compromisos de tarjeta en Estructura Fija para evitar duplicación presupuestaria
+        // Limpiar renglones viejos de compromisos de tarjeta en Estructura Fija
         if (cleanBudgets) {
           Object.values(state.budgetsByMonth || {}).forEach(b => {
             if (b.containers && b.containers.fija && Array.isArray(b.containers.fija.items)) {
